@@ -1,4 +1,4 @@
-package net.syuui.acoust.dataif.riff.wav;
+package net.syuui.acoust.dataif;
 
 public class DataFormatException extends Exception {
 	/**

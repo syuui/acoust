@@ -1,10 +1,23 @@
-package net.syuui.acoust.dataif.riff.wav;
+package net.syuui.acoust.dataif.riff;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+import net.syuui.acoust.dataif.DataFormatException;
+
+/**
+ * Class Riff
+ * 
+ * RIFF Data format class
+ * 
+ * @author zhouw
+ * @category DataIF
+ * @version 0.9
+ */
 public abstract class Riff {
+
+	public static int FOUR_CHARACTOR_CODE_LENGTH = 4;
 
 	private static String RIFF_ID = "RIFF";
 	private static String MSG01 = "Bad Riff ID specified. Should be \"RIFF\", current is ";
@@ -23,9 +36,9 @@ public abstract class Riff {
 	@SuppressWarnings("unused")
 	private static String MSG10 = "";
 
-	private byte[] riffId = new byte[4];
+	private byte[] riffId = new byte[FOUR_CHARACTOR_CODE_LENGTH];
 	private int riffSize = 0;
-	private byte[] riffType = new byte[4];
+	private byte[] riffType = new byte[FOUR_CHARACTOR_CODE_LENGTH];
 	private byte[] riffDataBuf = new byte[0];
 
 	private int ptr = 0;
@@ -59,7 +72,7 @@ public abstract class Riff {
 	 *             "RIFF". Otherwise, a DataFormatException will be thrown.
 	 */
 	public void setRiffId(byte[] riffId) throws DataFormatException {
-		if (!riffId.equals(RIFF_ID.getBytes())) {
+		if (! RIFF_ID.equals(new String(riffId))) {
 			throw new DataFormatException(MSG01 + new String(riffId));
 		}
 		this.riffId = riffId;
@@ -110,9 +123,11 @@ public abstract class Riff {
 	 * fill the data buf, and then return the data buf.
 	 * 
 	 * @return RIFF Data buf
+	 * @throws DataFormatException
+	 *             throw DataFormatException when data format error occurs.
 	 */
-	public byte[] getRiffData() {
-		riffDataBuf = spellRiffData();
+	public byte[] getRiffData() throws DataFormatException {
+		spellRiffData();
 		return riffDataBuf;
 	}
 
@@ -125,11 +140,13 @@ public abstract class Riff {
 	 * 
 	 * @param riffData
 	 *            RIFF Data buf
+	 * @throws DataFormatException
+	 *             throw DataFormatException when data format error occurs.
 	 */
-	public void setRiffData(byte[] riffData) {
+	public void setRiffData(byte[] riffData) throws DataFormatException {
 		this.riffDataBuf = riffData;
 		this.riffSize = riffData.length;
-		phraseRiffData(riffData);
+		phraseRiffData();
 	}
 
 	// -------------------------| Read method |-------------------------
@@ -153,7 +170,7 @@ public abstract class Riff {
 		if (read == -1)
 			throw new IOException(MSG02);
 
-		if (!riffId.equals(RIFF_ID.getBytes()))
+		if (!RIFF_ID.equals(new String(riffId)))
 			throw new DataFormatException(MSG01 + new String(riffId));
 
 		return read;
@@ -170,10 +187,9 @@ public abstract class Riff {
 	 *             thrown.
 	 */
 	public int readRiffSize(DataInputStream dis) throws IOException {
-		int read = dis.readInt();
+		int read = switchInt(dis.readInt());
 		if (read == -1)
 			throw new IOException(MSG03);
-		read = switchInt(read);
 		setRiffSize(read);
 		return read;
 	}
@@ -242,8 +258,83 @@ public abstract class Riff {
 		riffDataBuf = new byte[riffSize];
 		int read = dis.read(riffDataBuf, 0, riffDataBuf.length);
 		if (read > 0)
-			phraseRiffData(riffDataBuf);
+			phraseRiffData();
+		else {
+			System.out.println("================= Read Riff Data: Size is 0!!! Riff size is " + riffSize);
+		}
 		return read;
+	}
+
+	/**
+	 * Get one byte from data buf.
+	 *
+	 * @return The byte that Data Buffer Pointer currently pointing.
+	 * @throws DataFormatException
+	 *             If an overflowed pointer specified, a DataFormatException
+	 *             will be thrown.
+	 */
+	public byte readByte() throws DataFormatException {
+		if (ptr >= riffDataBuf.length)
+			throw new DataFormatException(MSG06);
+		return riffDataBuf[ptr++];
+	}
+
+	/**
+	 * Get a short value from data buf.
+	 * 
+	 * @return Short value that Data Buffer Pointer currently pointing.
+	 * @throws DataFormatException
+	 *             If an overflowed pointer specified, a DataFormatException
+	 *             will be thrown.
+	 */
+	public short readShort() throws DataFormatException {
+		if (ptr >= riffDataBuf.length + 1)
+			throw new DataFormatException(MSG06);
+
+		byte[] s = new byte[2];
+		s[0] = riffDataBuf[ptr++];
+		s[1] = riffDataBuf[ptr++];
+		return spellShort(s);
+	}
+
+	/**
+	 * Get an int value from data buf.
+	 * 
+	 * @return Int value that Data Buffer Pointer currently pointing.
+	 * @throws DataFormatException
+	 *             If an overflowed pointer specified, a DataFormatException
+	 *             will be thrown.
+	 */
+	public int readInt() throws DataFormatException {
+		if (ptr >= riffDataBuf.length + 3)
+			throw new DataFormatException(MSG06);
+
+		byte[] s = new byte[4];
+		s[0] = riffDataBuf[ptr++];
+		s[1] = riffDataBuf[ptr++];
+		s[2] = riffDataBuf[ptr++];
+		s[3] = riffDataBuf[ptr++];
+		return spellInt(s);
+	}
+
+	/**
+	 * Get consecutive bytes from data buf.
+	 * 
+	 * @param len
+	 *            Bytes to read
+	 * @return Byte values that Data Buffer Pointer currently pointing, with a
+	 *         length <CODE>len</CODE>.
+	 * @throws DataFormatException
+	 *             If an overflowed pointer specified, a DataFormatException
+	 *             will be thrown.
+	 */
+	public byte[] readBytes(int len) throws DataFormatException {
+		if (ptr >= riffDataBuf.length + len - 1)
+			throw new DataFormatException(MSG06);
+		byte[] s = new byte[len];
+		for (int i = 0; i < len; i++)
+			s[i] = riffDataBuf[ptr++];
+		return s;
 	}
 
 	// -------------------------| Write method |-------------------------
@@ -321,12 +412,106 @@ public abstract class Riff {
 	 * @throws IOException
 	 *             If error occurs during Writing, and IOException will be
 	 *             thrown.
+	 * @throws DataFormatException
+	 *             throw DataFormatException when data format error occurs.
 	 */
-	public void writeRiffData(DataOutputStream dos) throws IOException {
-		riffDataBuf = spellRiffData();
+	public void writeRiffData(DataOutputStream dos) throws IOException,
+			DataFormatException {
+		spellRiffData();
 		dos.write(riffDataBuf, 0, riffDataBuf.length);
 		return;
 	}
+
+	/**
+	 * Put a byte into data buf.
+	 * 
+	 * This method puts a byte into data buf, where the Data Buffer Pointer
+	 * currently pointing.
+	 * 
+	 * @param b
+	 *            Source data
+	 * @throws DataFormatException
+	 *             If an overflowed pointer specified, a DataFormatException
+	 *             will be thrown.
+	 */
+	public void writeByte(byte b) throws DataFormatException {
+		if (ptr >= riffDataBuf.length)
+			throw new DataFormatException(MSG06);
+		riffDataBuf[ptr++] = b;
+		return;
+	}
+
+	/**
+	 * Put a short variable into data buf.
+	 * 
+	 * This method puts a short variable into data buf.<br>
+	 * First byte of input parameter <CODE>s</CODE> will be put to the element
+	 * that Data Buffer Pointer currently pointing, second byte to the next
+	 * element.
+	 * 
+	 * @param s
+	 *            Source data
+	 * @throws DataFormatException
+	 *             If an overflowed pointer specified, a DataFormatException
+	 *             will be thrown.
+	 */
+	public void writeShort(short s) throws DataFormatException {
+		if (ptr >= riffDataBuf.length + 1)
+			throw new DataFormatException(MSG06);
+
+		byte[] b = splitShort(s);
+		riffDataBuf[ptr++] = b[0];
+		riffDataBuf[ptr++] = b[1];
+		return;
+	}
+
+	/**
+	 * Put an int variable into data buf.
+	 * 
+	 * This method puts an int variable into data buf.<br>
+	 * First byte of input parameter <CODE>s</CODE> will be put to the element
+	 * that Data Buffer Pointer currently pointing, second byte to the second
+	 * element, third byte to third element and last byte to last element.
+	 * 
+	 * @param s
+	 *            Source data
+	 * @throws DataFormatException
+	 *             If an overflowed pointer specified, a DataFormatException
+	 *             will be thrown.
+	 */
+	public void writeInt(int s) throws DataFormatException {
+		if (ptr >= riffDataBuf.length + 3)
+			throw new DataFormatException(MSG06);
+
+		byte[] b = splitInt(s);
+		riffDataBuf[ptr++] = b[0];
+		riffDataBuf[ptr++] = b[1];
+		riffDataBuf[ptr++] = b[2];
+		riffDataBuf[ptr++] = b[3];
+		return;
+	}
+
+	/**
+	 * Put a byte array into data buf.
+	 * 
+	 * This method will puts a byte array into data buf, with a start position
+	 * that Data Buffer Pointer currently pointting.
+	 * 
+	 * @param s
+	 *            Source Data
+	 * @throws DataFormatException
+	 *             If an overflowed pointer specified, a DataFormatException
+	 *             will be thrown.
+	 */
+	public void writeBytes(byte[] s) throws DataFormatException {
+		if (ptr >= riffDataBuf.length + s.length - 1)
+			throw new DataFormatException(MSG06);
+		for (int i = 0; i < s.length; i++)
+			riffDataBuf[ptr++] = s[i];
+		return;
+	}
+
+	// -------------------------| Data Buffer Pointer |-------------------------
 
 	/**
 	 * Set Data Buffer Pointer to the top of the data buf.
@@ -351,76 +536,15 @@ public abstract class Riff {
 	}
 
 	/**
-	 * Get one byte from data buf.
-	 *
-	 * @return The byte that Data Buffer Pointer currently pointing.
-	 * @throws DataFormatException
-	 *             If an overflowed pointer specified, a DataFormatException
-	 *             will be thrown.
-	 */
-	public byte getByte() throws DataFormatException {
-		if (ptr >= riffDataBuf.length)
-			throw new DataFormatException(MSG06);
-		return riffDataBuf[ptr++];
-	}
-
-	/**
-	 * Get a short value from data buf.
+	 * End of Buffer.
 	 * 
-	 * @return Short value that Data Buffer Pointer currently pointing.
-	 * @throws DataFormatException
-	 *             If an overflowed pointer specified, a DataFormatException
-	 *             will be thrown.
+	 * @return true if reach end of buffer, otherwise false.
 	 */
-	public short getShort() throws DataFormatException {
-		if (ptr >= riffDataBuf.length + 1)
-			throw new DataFormatException(MSG06);
-
-		byte[] s = new byte[2];
-		s[0] = riffDataBuf[ptr++];
-		s[1] = riffDataBuf[ptr++];
-		return spellShort(s);
+	public boolean eob() {
+		return ptr >= riffDataBuf.length;
 	}
 
-	/**
-	 * Get an int value from data buf.
-	 * 
-	 * @return Int value that Data Buffer Pointer currently pointing.
-	 * @throws DataFormatException
-	 *             If an overflowed pointer specified, a DataFormatException
-	 *             will be thrown.
-	 */
-	public int getInt() throws DataFormatException {
-		if (ptr >= riffDataBuf.length + 3)
-			throw new DataFormatException(MSG06);
-
-		byte[] s = new byte[4];
-		s[0] = riffDataBuf[ptr++];
-		s[1] = riffDataBuf[ptr++];
-		s[2] = riffDataBuf[ptr++];
-		s[3] = riffDataBuf[ptr++];
-		return spellInt(s);
-	}
-
-	/**
-	 * Get consecutive bytes from data buf.
-	 * 
-	 * @param len
-	 *            Bytes to read
-	 * @return Byte values that Data Buffer Pointer currently pointing, with a
-	 *         length <CODE>len</CODE>.
-	 * @throws DataFormatException
-	 *             If an overflowed pointer specified, a DataFormatException
-	 *             will be thrown.
-	 */
-	public byte[] getBytes(int len) throws DataFormatException {
-		if (ptr >= riffDataBuf.length + len - 1)
-			throw new DataFormatException(MSG06);
-		byte[] s = new byte[len];
-		for (int i = 0; i < len; i++)
-			s[i] = riffDataBuf[ptr++];
-		return s;
-	}
+	// -------------------------| Static method |-------------------------
 
 	/**
 	 * Spell a short variable by 2 byte variables.
@@ -434,13 +558,13 @@ public abstract class Riff {
 	 *            Input parameter, should be byte[2].
 	 * @return Spelled short variable.
 	 */
-	public short spellShort(byte[] b) {
+	public static short spellShort(byte[] b) {
 		if (b.length == 0)
 			return 0;
 		else if (b.length == 1)
-			return (short) (b[0] << 8);
+			return (short) ((b[0] & 0xFF) << 8);
 		else
-			return (short) (b[0] << 8 + b[1]);
+			return (short) (((b[0] & 0xFF) << 8) + (b[1] & 0xFF));
 	}
 
 	/**
@@ -456,17 +580,27 @@ public abstract class Riff {
 	 *            Input parameter, should be byte[4].
 	 * @return Spelled int variable.
 	 */
-	public int spellInt(byte[] b) {
+	public static int spellInt(byte[] b) {
+
+		int i[] = new int[4];
+
+		i[0] = (b[0] & 0xFF) << 24;
+		i[1] = (b[1] & 0xFF) << 16;
+		i[2] = (b[2] & 0xFF) << 8;
+		i[3] = (b[3]) & 0xFF;
+
 		if (b.length == 0)
 			return 0;
 		else if (b.length == 1)
-			return b[0] << 24;
+			return ((b[0] & 0xFF) << 24);
 		else if (b.length == 2)
-			return (b[0] << 24) + (b[1] << 16);
+			return ((b[0] & 0xFF) << 24) + ((b[1] & 0xFF) << 16);
 		else if (b.length == 3)
-			return (b[0] << 14) + (b[1] << 16) + (b[2] << 8);
+			return ((b[0] & 0xFF) << 24) + ((b[1] & 0xFF) << 16)
+					+ ((b[2] & 0xFF) << 8);
 		else
-			return (b[0] << 14) + (b[1] << 16) + (b[2] << 8) + (b[3]);
+			return ((b[0] & 0xFF) << 24) + ((b[1] & 0xFF) << 16)
+					+ ((b[2] & 0xFF) << 8) + ((b[3]) & 0xFF);
 	}
 
 	/**
@@ -482,7 +616,7 @@ public abstract class Riff {
 	 *            Input short variable
 	 * @return Splitted array
 	 */
-	public byte[] splitShort(short s) {
+	public static byte[] splitShort(short s) {
 		byte[] b = new byte[2];
 		b[0] = (byte) ((s & 0xFF00) >> 8);
 		b[1] = (byte) (s & 0x00FF);
@@ -503,12 +637,12 @@ public abstract class Riff {
 	 *            Input int variable
 	 * @return Splitted array
 	 */
-	public byte[] splitInt(int s) {
+	public static byte[] splitInt(int s) {
 		byte[] b = new byte[4];
-		b[0] = (byte) ((s & 0xFF000000) >> 24);
-		b[1] = (byte) ((s & 0x00FF0000) >> 16);
-		b[2] = (byte) ((s & 0x0000FF00) >> 8);
-		b[3] = (byte) (s & 0x000000FF);
+		b[0] = (byte) (s >> 24);
+		b[1] = (byte) ((s >> 16) & 0x00FF);
+		b[2] = (byte) ((s >> 8) & 0x00FF);
+		b[3] = (byte) (s & 0xFF);
 		return b;
 	}
 
@@ -523,7 +657,7 @@ public abstract class Riff {
 	 *            Input parameter
 	 * @return switched short variable
 	 */
-	public short switchShort(short s) {
+	public static short switchShort(short s) {
 		byte b[] = splitShort(s);
 		byte r[] = new byte[2];
 		r[0] = b[1];
@@ -542,7 +676,7 @@ public abstract class Riff {
 	 *            Input parameter
 	 * @return switched int variable
 	 */
-	public int switchInt(int s) {
+	public static int switchInt(int s) {
 		byte[] b = splitInt(s);
 		byte[] r = new byte[4];
 		r[0] = b[3];
@@ -556,21 +690,27 @@ public abstract class Riff {
 	 * Phrase RIFF Data
 	 * 
 	 * This abstract method should phrase RIFF Data in data buf
-	 * {@link #riffDataBuf}, and fill fields for each RIFF Type.
+	 * {@link #riffDataBuf}, and fill fields for each RIFF Type.<br>
+	 * Use {@link #readByte()}, {@link #readShort()}, {@link #readInt()} and
+	 * {@link #readBytes(int)} to read data from data buf.
 	 * 
-	 * @param riffData
-	 *            data buf
+	 * @throws DataFormatException
+	 *             throw DataFormatException when data format error occurs.
 	 */
-	public abstract void phraseRiffData(byte[] riffData);
+	public abstract void phraseRiffData() throws DataFormatException;
 
 	/**
 	 * Spell RIFF Data
 	 * 
 	 * This abstract method should spell a RIFF Data into data buf
-	 * {@link #riffDataBuf} with fields in specified RIFF Type.
+	 * {@link #riffDataBuf} with fields in specified RIFF Type.<br>
+	 * Use {@link #writeByte(byte)}, {@link #writeShort(short)},
+	 * {@link #writeInt(int)} and {@link #writeBytes(byte[])} to write data to
+	 * data buf.
 	 * 
-	 * @return data buf
+	 * @throws DataFormatException
+	 *             throw DataFormatException when data format error occurs.
 	 */
-	public abstract byte[] spellRiffData();
+	public abstract void spellRiffData() throws DataFormatException;
 
 }
