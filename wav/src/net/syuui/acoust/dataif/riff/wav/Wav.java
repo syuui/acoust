@@ -6,11 +6,31 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
-
+import net.syuui.acoust.dataif.DataFormatException;
 import net.syuui.acoust.dataif.StaticTools;
 import net.syuui.acoust.dataif.riff.Riff;
 
+/**
+ * Wav.class
+ * 
+ * Wav data class of RIFF library
+ * 
+ * @author zhouw
+ * @category DataIF
+ * @version 1.0
+ */
 public class Wav extends Riff {
+
+	private static String MSG01 = "fmt chunk ID must be a \"Four_Charactor_Code\".";
+	private static String MSG02 = "fmt chunk size must be greater or equal 0.";
+	@SuppressWarnings("unused")
+	private static String MSG03 = "";
+	@SuppressWarnings("unused")
+	private static String MSG04 = "";
+	@SuppressWarnings("unused")
+	private static String MSG05 = "";
+	@SuppressWarnings("unused")
+	private static String MSG06 = "";
 
 	// fmt Chunk header
 	private byte[] fmtChunkId = new byte[FOUR_CHARACTOR_CODE_LENGTH];
@@ -23,7 +43,7 @@ public class Wav extends Riff {
 	private int byteRate = 0;
 	private short blockAlign = 0;
 	private short quantizingBits = 0;
-	private byte[] additionalInfo = new byte[2];
+	private byte[] additionalInfo = new byte[0];
 
 	// fact Chunk
 	private byte[] factChunkId = new byte[0];
@@ -38,119 +58,112 @@ public class Wav extends Riff {
 	private short channel2[] = new short[0];
 
 	@Override
-	public void readFromFile(FileInputStream fis) {
+	public void readFromFile(FileInputStream fis) throws DataFormatException,
+			IOException {
 		DataInputStream dis = new DataInputStream(fis);
 		byte[] tmp = new byte[FOUR_CHARACTOR_CODE_LENGTH];
 
-		try {
+		dis.read(tmp, 0, tmp.length);
+		setRiffId(tmp);
+
+		setRiffSize(StaticTools.switchInt(dis.readInt()));
+
+		dis.read(tmp, 0, tmp.length);
+		setRiffType(tmp);
+
+		dis.read(fmtChunkId, 0, fmtChunkId.length);
+		fmtChunkSize = StaticTools.switchInt(dis.readInt());
+
+		audioFormat = StaticTools.switchShort(dis.readShort());
+		numberChannel = StaticTools.switchShort(dis.readShort());
+		samplingFrequence = StaticTools.switchInt(dis.readInt());
+		byteRate = StaticTools.switchInt(dis.readInt());
+		blockAlign = StaticTools.switchShort(dis.readShort());
+		quantizingBits = StaticTools.switchShort(dis.readShort());
+
+		if (fmtChunkSize > 16) {
+			additionalInfo = new byte[fmtChunkSize - 16];
+			dis.read(additionalInfo, 0, additionalInfo.length);
+		}
+
+		dis.read(tmp, 0, tmp.length);
+		if (new String(tmp).equals("fact")) {
+			factChunkId = tmp;
+			factChunkSize = StaticTools.switchInt(dis.readInt());
+			factData = new byte[factChunkSize];
+			dis.read(factData, 0, factData.length);
 			dis.read(tmp, 0, tmp.length);
-			setRiffId(tmp);
+		}
 
-			setRiffSize(StaticTools.switchInt(dis.readInt()));
+		dataChunkId = tmp;
+		dataChunkSize = StaticTools.switchInt(dis.readInt());
 
-			dis.read(tmp, 0, tmp.length);
-			setRiffType(tmp);
-
-			dis.read(fmtChunkId, 0, fmtChunkId.length);
-			fmtChunkSize = StaticTools.switchInt(dis.readInt());
-
-			audioFormat = StaticTools.switchShort(dis.readShort());
-			numberChannel = StaticTools.switchShort(dis.readShort());
-			samplingFrequence = StaticTools.switchInt(dis.readInt());
-			byteRate = StaticTools.switchInt(dis.readInt());
-			blockAlign = StaticTools.switchShort(dis.readShort());
-			quantizingBits = StaticTools.switchShort(dis.readShort());
-			if (fmtChunkSize == 18) {
-				dis.read(tmp, 0, 2);
-				System.arraycopy(tmp, 0, additionalInfo, 0, 2);
-			}
-
-			dis.read(tmp, 0, tmp.length);
-			if (new String(tmp).equals("fact")) {
-				factChunkId = tmp;
-				factChunkSize = StaticTools.switchInt(dis.readInt());
-				factData = new byte[factChunkSize];
-				dis.read(factData, 0, factData.length);
-				dis.read(tmp, 0, tmp.length);
-			}
-
-			dataChunkId = tmp;
-			dataChunkSize = StaticTools.switchInt(dis.readInt());
-
-			int ndata = (dataChunkSize) / (quantizingBits / 8) / numberChannel;
-			channel1 = new short[ndata];
-			if (numberChannel == 2)
-				channel2 = new short[ndata];
-			for (int i = 0; i < ndata; i++) {
-				if (quantizingBits == 8) {
-					channel1[i] = (short) dis.readByte();
-					if (numberChannel == 2) {
-						channel2[i] = (short) (dis.readByte());
-					}
-				} else {
-					channel1[i] = StaticTools.switchShort(dis.readShort());
-					if (numberChannel == 2) {
-						channel2[i] = StaticTools.switchShort(dis.readShort());
-					}
+		int ndata = (dataChunkSize) / (quantizingBits / 8) / numberChannel;
+		channel1 = new short[ndata];
+		if (numberChannel == 2)
+			channel2 = new short[ndata];
+		for (int i = 0; i < ndata; i++) {
+			if (quantizingBits == 8) {
+				channel1[i] = (short) dis.readByte();
+				if (numberChannel == 2) {
+					channel2[i] = (short) (dis.readByte());
+				}
+			} else {
+				channel1[i] = StaticTools.switchShort(dis.readShort());
+				if (numberChannel == 2) {
+					channel2[i] = StaticTools.switchShort(dis.readShort());
 				}
 			}
-			dis.close();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
+		dis.close();
+
 		return;
 	}
 
 	@Override
-	public void writeToFile(FileOutputStream fos) {
+	public void writeToFile(FileOutputStream fos) throws IOException {
 		DataOutputStream dos = new DataOutputStream(fos);
 
-		try {
-			dos.write(getRiffId());
-			dos.writeInt(StaticTools.switchInt(getRiffSize()));
-			dos.write(getRiffType());
+		dos.write(getRiffId());
+		dos.writeInt(StaticTools.switchInt(getRiffSize()));
+		dos.write(getRiffType());
 
-			dos.write(fmtChunkId);
-			dos.write(StaticTools.switchInt(fmtChunkSize));
+		dos.write(fmtChunkId);
+		dos.write(StaticTools.switchInt(fmtChunkSize));
 
-			dos.writeShort(StaticTools.switchShort(getAudioFormat()));
-			dos.writeShort(StaticTools.switchShort(getNumberChannel()));
-			dos.writeInt(StaticTools.switchInt(getSamplingFrequence()));
-			dos.writeInt(StaticTools.switchInt(getByteRate()));
-			dos.writeShort(StaticTools.switchShort(getBlockAlign()));
-			dos.writeShort(StaticTools.switchShort(getQuantizingBits()));
-			if (fmtChunkSize == 18) {
-				dos.write(additionalInfo, 0, additionalInfo.length);
-			}
+		dos.writeShort(StaticTools.switchShort(getAudioFormat()));
+		dos.writeShort(StaticTools.switchShort(getNumberChannel()));
+		dos.writeInt(StaticTools.switchInt(getSamplingFrequence()));
+		dos.writeInt(StaticTools.switchInt(getByteRate()));
+		dos.writeShort(StaticTools.switchShort(getBlockAlign()));
+		dos.writeShort(StaticTools.switchShort(getQuantizingBits()));
+		if (fmtChunkSize == 18) {
+			dos.write(additionalInfo, 0, additionalInfo.length);
+		}
 
-			if (getFactChunkId().length == 4) {
-				dos.write(getFactChunkId());
-				dos.writeInt(StaticTools.switchInt(getFactChunkSize()));
-				dos.write(getFactData());
-			}
+		if (getFactChunkId().length == 4) {
+			dos.write(getFactChunkId());
+			dos.writeInt(StaticTools.switchInt(getFactChunkSize()));
+			dos.write(getFactData());
+		}
 
-			dos.write(getDataChunkId());
-			dos.writeInt(StaticTools.switchInt(getDataChunkSize()));
-			int ndata = (dataChunkSize) / (quantizingBits / 8) / numberChannel;
-			for (int i = 0; i < ndata; i++) {
-				if (quantizingBits == 8) {
-					dos.write((byte) ((StaticTools.switchShort(channel1[i])) & 0xFF));
-					if (numberChannel == 2) {
-						dos.write((byte) ((StaticTools.switchShort(channel2[i])) & 0xFF));
-					}
-				} else {
-					dos.writeShort(StaticTools.switchShort(channel1[i]));
-					if (numberChannel == 2) {
-						dos.writeShort(StaticTools.switchShort(channel2[i]));
-					}
+		dos.write(getDataChunkId());
+		dos.writeInt(StaticTools.switchInt(getDataChunkSize()));
+		int ndata = (dataChunkSize) / (quantizingBits / 8) / numberChannel;
+		for (int i = 0; i < ndata; i++) {
+			if (quantizingBits == 8) {
+				dos.write((byte) ((StaticTools.switchShort(channel1[i])) & 0xFF));
+				if (numberChannel == 2) {
+					dos.write((byte) ((StaticTools.switchShort(channel2[i])) & 0xFF));
+				}
+			} else {
+				dos.writeShort(StaticTools.switchShort(channel1[i]));
+				if (numberChannel == 2) {
+					dos.writeShort(StaticTools.switchShort(channel2[i]));
 				}
 			}
-			dos.close();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
+		dos.close();
 		return;
 	}
 
@@ -169,7 +182,12 @@ public class Wav extends Riff {
 
 	public int autoSetRiffSize() {
 		int rs = dataChunkSize + fmtChunkSize + 20;
-		setRiffSize(rs);
+		try {
+			setRiffSize(rs);
+		} catch (DataFormatException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		return rs;
 	}
 
@@ -177,17 +195,33 @@ public class Wav extends Riff {
 		return Arrays.copyOf(fmtChunkId, fmtChunkId.length);
 	}
 
-	public void setFmtChunkId(byte[] fmtChunkId) {
-		if (fmtChunkId != null)
+	public void setFmtChunkId(byte[] fmtChunkId) throws DataFormatException {
+		if (fmtChunkId == null || fmtChunkId.length != 4) {
+			throw new DataFormatException(MSG01);
+		} else {
 			this.fmtChunkId = Arrays.copyOf(fmtChunkId, fmtChunkId.length);
+		}
+
+	}
+
+	public void setFmtChunkId(String fmtChunkId) throws DataFormatException {
+		if (fmtChunkId != null) {
+			setFmtChunkId(fmtChunkId.getBytes());
+		} else {
+			throw new DataFormatException(MSG01);
+		}
 	}
 
 	public int getFmtChunkSize() {
 		return fmtChunkSize;
 	}
 
-	public void setFmtChunkSize(int fmtChunkSize) {
-		this.fmtChunkSize = fmtChunkSize;
+	public void setFmtChunkSize(int fmtChunkSize) throws DataFormatException {
+		if (fmtChunkSize >= 0) {
+			this.fmtChunkSize = fmtChunkSize;
+		} else {
+			throw new DataFormatException(MSG02);
+		}
 	}
 
 	public short getAudioFormat() {

@@ -1,5 +1,11 @@
 package net.syuui.acoust.dataif;
 
+/**
+ * StaticTools.class: Static tool functions for RIFF library
+ * @author zhouw
+ * @version 1.0
+ */
+
 public class StaticTools {
 
 	/**
