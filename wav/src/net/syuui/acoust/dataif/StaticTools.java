@@ -2,6 +2,7 @@ package net.syuui.acoust.dataif;
 
 /**
  * StaticTools.class: Static tool functions for RIFF library
+ * 
  * @author zhouw
  * @version 1.0
  */
@@ -27,6 +28,13 @@ public class StaticTools {
 			return (short) ((b[0] & 0xFF) << 8);
 		else
 			return (short) (((b[0] & 0xFF) << 8) + (b[1] & 0xFF));
+	}
+
+	public static short spellShort(byte b0, byte b1) {
+		byte tmp[] = new byte[2];
+		tmp[0] = b0;
+		tmp[1] = b1;
+		return spellShort(tmp);
 	}
 
 	/**
@@ -63,6 +71,15 @@ public class StaticTools {
 		else
 			return ((b[0] & 0xFF) << 24) + ((b[1] & 0xFF) << 16)
 					+ ((b[2] & 0xFF) << 8) + ((b[3]) & 0xFF);
+	}
+
+	public static int spellInt(byte b0, byte b1, byte b2, byte b3) {
+		byte[] tmp = new byte[4];
+		tmp[0] = b0;
+		tmp[1] = b1;
+		tmp[2] = b2;
+		tmp[3] = b3;
+		return spellInt(tmp);
 	}
 
 	/**
