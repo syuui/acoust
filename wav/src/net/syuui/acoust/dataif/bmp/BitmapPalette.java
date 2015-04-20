@@ -1,6 +1,6 @@
 package net.syuui.acoust.dataif.bmp;
 
-public class Palette {
+public class BitmapPalette {
 	/*
 	 * 3 ：颜色表 颜色表用于说明位图中的颜色，它有若干个表项，每一个表项是一个RGBQUAD 类型的结构，定义一种颜色。 　　
 	 */
@@ -42,4 +42,16 @@ public class Palette {
 	public void setRgbRed(byte rgbRed) {
 		this.rgbRed = rgbRed;
 	}
+
+	public BitmapPalette(byte rgbRed, byte rgbGreen, byte rgbBlue) {
+		super();
+		this.rgbBlue = rgbBlue;
+		this.rgbGreen = rgbGreen;
+		this.rgbRed = rgbRed;
+	}
+
+	public BitmapPalette() {
+		super();
+	}
+
 }

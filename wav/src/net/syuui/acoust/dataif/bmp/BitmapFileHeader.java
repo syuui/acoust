@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 import net.syuui.acoust.dataif.StaticTools;
 
-public class BmpHeader {
+public class BitmapFileHeader {
 	/*
 	 * BMP文件头 (14 字节 ) 　 　 BMP文件头数据结构含有 BMP 文件的类型、文件大小和位图起始位置等信息。　
 	 */

@@ -2,28 +2,33 @@ package net.syuui.acoust.dataif.bmp;
 
 import net.syuui.acoust.dataif.StaticTools;
 
-public class ImgHeader {
+public class BitmapInfo {
 	/*
 	 * 位图信息头(40 字节 ) BMP 位图信息头数据用于说明位图的尺寸等信息。
 	 */
-	
+
+	public static int BI_RGB = 0;
+	public static int BI_RLE8 = 1;
+	public static int BI_RLE4 = 2;
+	public static int BI_BIT_FIELDS = 3;
+
 	public static int IMG_HEADER_SIZE = 40;
-	
+
 	// (14-17 字节)
 	// 本结构所占用字节数
-	int Size;
+	int biSize;
 
 	// (18-21 字节)
 	// 位图的宽度，以像素为单位
-	int image_width;
+	int biWidth;
 
 	// (22-25 字节)
 	// 位图的高度，以像素为单位 　　
-	int image_heigh;
+	int biHeight;
 
 	// (26-27 字节)
 	// 目标设备的级别，必须为 1　
-	short Planes;
+	short biPlanes;
 
 	// (28-29 字节)
 	// 每个像素所需的位数，必须是 1(双色 ),4(16 色),8(256 色) 或 24(真彩色)之一　　
@@ -35,7 +40,7 @@ public class ImgHeader {
 
 	// (34-37 字节)　　
 	// 位图的大小，以字节为单位
-	int SizeImage;
+	int biSizeImage;
 
 	// (38-41 字节)
 	// 位图水平分辨率，每米像素数
@@ -53,36 +58,40 @@ public class ImgHeader {
 	// 位图显示过程中重要的颜色数
 	int biClrImportant;
 
+	// (Not stored in BMP)
+	// 保存每一行像素所需要的字节数，必须为4的倍数
+	int nBytePerLine;
+
 	public int getSize() {
-		return Size;
+		return biSize;
 	}
 
 	public void setSize(int size) {
-		Size = size;
+		biSize = size;
 	}
 
 	public int getImage_width() {
-		return image_width;
+		return biWidth;
 	}
 
 	public void setImage_width(int image_width) {
-		this.image_width = image_width;
+		this.biWidth = image_width;
 	}
 
 	public int getImage_heigh() {
-		return image_heigh;
+		return biHeight;
 	}
 
 	public void setImage_heigh(int image_heigh) {
-		this.image_heigh = image_heigh;
+		this.biHeight = image_heigh;
 	}
 
 	public short getPlanes() {
-		return Planes;
+		return biPlanes;
 	}
 
 	public void setPlanes(short planes) {
-		Planes = planes;
+		biPlanes = planes;
 	}
 
 	public short getBiBitCount() {
@@ -102,11 +111,11 @@ public class ImgHeader {
 	}
 
 	public int getSizeImage() {
-		return SizeImage;
+		return biSizeImage;
 	}
 
 	public void setSizeImage(int sizeImage) {
-		SizeImage = sizeImage;
+		biSizeImage = sizeImage;
 	}
 
 	public int getBiXPelsPerMeter() {
@@ -139,6 +148,20 @@ public class ImgHeader {
 
 	public void setBiClrImportant(int biClrImportant) {
 		this.biClrImportant = biClrImportant;
+	}
+
+	public int getnBytePerLine() {
+		if ((biBitCount * biWidth) % 32 == 0) {
+			nBytePerLine = biBitCount / 8;
+		} else {
+			nBytePerLine = ((biBitCount * biWidth / 32) + 1) * 4;
+		}
+
+		return nBytePerLine;
+	}
+
+	public void setnBytePerLine(int nBytePerLine) {
+		this.nBytePerLine = nBytePerLine;
 	}
 
 	public boolean setAllImgHeader(byte buf[]) {
