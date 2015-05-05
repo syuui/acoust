@@ -152,7 +152,7 @@ public class BitmapInfo {
 
 	public int getnBytePerLine() {
 		if ((biBitCount * biWidth) % 32 == 0) {
-			nBytePerLine = biBitCount / 8;
+			nBytePerLine = biBitCount * biWidth / 8;
 		} else {
 			nBytePerLine = ((biBitCount * biWidth / 32) + 1) * 4;
 		}

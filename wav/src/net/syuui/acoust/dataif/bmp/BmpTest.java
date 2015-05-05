@@ -2,7 +2,6 @@ package net.syuui.acoust.dataif.bmp;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.EventQueue;
 import java.awt.Graphics;
 import java.io.DataInputStream;
 import java.io.File;
@@ -11,18 +10,13 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.rmi.dgc.DGC;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
-import javax.swing.border.EmptyBorder;
-
-import org.hamcrest.DiagnosingMatcher;
-import org.junit.Ignore;
-
-import net.syuui.acoust.dataif.StaticTools;
 
 public class BmpTest {
+
+	private static int PASS_LINE = 60;
 
 	/**
 	 * Launch the application.
@@ -30,7 +24,7 @@ public class BmpTest {
 	public static void main(String[] args) {
 		Bitmap B = new Bitmap();
 
-		File f = new File("C:\\Users\\zhouw\\Desktop\\test\\card01.bmp");
+		File f = new File("C:\\Users\\zhouw\\Desktop\\test\\card00.bmp");
 		FileInputStream fis;
 		try {
 			fis = new FileInputStream(f);
@@ -97,11 +91,11 @@ public class BmpTest {
 		Graphics gc = jp.getGraphics();
 		BitmapPalette[][] img = B.getIntImageWithPalette();
 
-		BitmapDot[] dt = additionalProc(img);
+		BitmapDot[] rec = additionalProc(img);
 
 		int h, w;
 		int cr, cg, cb;
-		int x1, y1, x2, y2;
+
 		h = B.imgHeader.getImage_heigh();
 		w = B.imgHeader.getImage_width();
 
@@ -115,6 +109,20 @@ public class BmpTest {
 				gc.drawRect(j, h - i, 1, 1);
 			}
 		}
+
+		System.out.printf("(%d,%d) - (%d,%d)", rec[0].getX(), rec[0].getY(),
+				rec[1].getX(), rec[1].getY());
+
+		gc.setColor(Color.BLUE);
+		gc.drawLine(rec[0].getX(), h - rec[0].getY(), rec[0].getX(),
+				h - rec[1].getY());
+		gc.drawLine(rec[0].getX(), h - rec[0].getY(), rec[1].getX(),
+				h - rec[0].getY());
+		gc.drawLine(rec[1].getX(), h - rec[0].getY(), rec[1].getX(),
+				h - rec[1].getY());
+		gc.drawLine(rec[0].getX(), h - rec[1].getY(), rec[1].getX(),
+				h - rec[1].getY());
+
 	}
 
 	// Bitmaps saved in img[][], each dot contains a Palette class
@@ -127,10 +135,7 @@ public class BmpTest {
 		// edgeDerivative_1(img);
 
 		int[][] gray = color2gray(img);
-
-		img = gray2color(gray);
-
-		return null;
+		return cutEdge(gray);
 	}
 
 	public static int[][] color2gray(BitmapPalette[][] img) {
@@ -145,8 +150,106 @@ public class BmpTest {
 						* img[i][j].getRgbGreen() + 11 * img[i][j].getRgbBlue()) / 100;
 			}
 		}
-
 		return g;
+	}
+
+	public static BitmapDot[] cutEdge(int[][] img) {
+		int i, j, h, w;
+		h = img.length;
+		w = img[0].length;
+
+		BitmapDot[] rlt = new BitmapDot[2];
+		rlt[0] = new BitmapDot();
+		rlt[1] = new BitmapDot();
+
+		int d[][] = new int[h][w];
+		// 2-time diff ( horizonal )
+		for (i = 0; i < h; i++) {
+			for (j = 0; j < w; j++) {
+				if (j == 0) {
+					d[i][j] = Math.abs(img[i][j + 1] - img[i][j] / 2);
+				} else if (j == w - 1) {
+					d[i][j] = Math.abs(img[i][j] / 2 - img[i][j - 1]);
+				} else {
+					d[i][j] = Math.abs(img[i][j - 1] + img[i][j + 1]
+							- img[i][j] * 2);
+				}
+				d[i][j] = d[i][j] > 60 ? 255 : 0;
+			}
+		}
+
+		// Get horizonal integral
+		int[] sum = new int[w];
+		for (j = 0; j < w; j++)
+			sum[j] = 0;
+
+		for (i = 0; i < h; i++)
+			for (j = 0; j < w; j++)
+				sum[j] += d[i][j];
+
+		for (j = 0; j < w; j++)
+			System.out.println(sum[j]);
+
+		int max = -1, x1 = 0, x2 = 0;
+		for (j = 0; j < w; j++)
+			if (sum[j] > max) {
+				x1 = j;
+				max = sum[j];
+			}
+
+		for (j = 0, max = -1; j < w; j++)
+			if (sum[j] > max && j != x1) {
+				x2 = j;
+				max = sum[j];
+			}
+
+		rlt[0].setX(x1);
+		rlt[1].setX(x2);
+
+		// 2-time diff ( vertical )
+		for (i = 0; i < h; i++) {
+			for (j = 0; j < w; j++) {
+				if (i == 0) {
+					d[i][j] = Math.abs(img[i + 1][j] - img[i][j] / 2);
+				} else if (i == h - 1) {
+					d[i][j] = Math.abs(img[i][j] / 2 - img[i - 1][j]);
+				} else {
+					d[i][j] = Math.abs(img[i + 1][j] + img[i - 1][j]
+							- img[i][j] * 2);
+				}
+				d[i][j] = d[i][j] > PASS_LINE ? 255 : 0;
+			}
+		}
+
+		// Get vertical integral
+		sum = new int[h];
+		for (i = 0; i < h; i++)
+			sum[i] = 0;
+
+		for (i = 0; i < h; i++)
+			for (j = 0; j < w; j++)
+				sum[i] += d[i][j];
+
+		max = -1;
+		x1 = 0;
+		x2 = 0;
+		for (i = 0; i < h; i++)
+			if (sum[i] > max) {
+				x1 = i;
+				max = sum[i];
+			}
+
+		for (i = 0, max = -1; i < h; i++)
+			if (sum[i] > max && i != x1) {
+				x2 = i;
+				max = sum[i];
+			}
+
+		rlt[0].setY(x1);
+		rlt[1].setY(x2);
+
+		return rlt;
+
 	}
 
 	public static BitmapPalette[][] gray2color(int[][] img) {
@@ -163,212 +266,6 @@ public class BmpTest {
 		}
 
 		return g;
-	}
-
-	private static BitmapDot[] edgeDerivative_1(BitmapPalette[][] img) {
-		int i, j, h, w;
-		h = img.length;
-		w = img[0].length;
-
-		int g[][] = new int[h][w], d1[][] = new int[h][w];
-		for (i = 0; i < h; i++) {
-			for (j = 0; j < w; j++) {
-				g[i][j] = (30 * img[i][j].getRgbRed() + 59
-						* img[i][j].getRgbGreen() + 11 * img[i][j].getRgbBlue()) / 100;
-			}
-		}
-
-		// D1
-		for (i = 0; i < h; i++) {
-			for (j = 0; j < w; j++) {
-				if (j == 0) {
-					d1[i][j] = g[i][j + 1] - g[i][j];
-				} else if (j == w - 1) {
-					d1[i][j] = g[i][j] - g[i][j - 1];
-				} else {
-					d1[i][j] = g[i][j + 1] + g[i][j - 1] - 2 * g[i][j];
-				}
-			}
-		}
-		for (i = 0; i < h; i++) {
-			for (j = 1; j < w; j++) {
-				if (d1[i][j] * d1[i][j - 1] < 0) {
-					img[i][j].setRgbRed((byte) 255);
-					img[i][j].setRgbGreen((byte) 255);
-					img[i][j].setRgbBlue((byte) 255);
-				} else {
-					img[i][j].setRgbRed((byte) 0);
-					img[i][j].setRgbGreen((byte) 0);
-					img[i][j].setRgbBlue((byte) 0);
-
-				}
-			}
-		}
-
-		return null;
-	}
-
-	private static void edgeVerticalDifferential(BitmapPalette[][] img) {
-		int i, j, h, w;
-		BitmapPalette[] pals = new BitmapPalette[256];
-
-		for (i = 0; i < 256; i++) {
-			pals[i] = new BitmapPalette((byte) i, (byte) i, (byte) i);
-		}
-
-		h = img.length;
-		w = img[0].length;
-		int g[][] = new int[h][w];
-
-		for (i = 0; i < h; i++) {
-			for (j = 0; j < w; j++) {
-				g[i][j] = (30 * img[i][j].getRgbRed() + 59
-						* img[i][j].getRgbGreen() + 11 * img[i][j].getRgbBlue()) / 100;
-			}
-		}
-		for (j = 0; j < w; j++) {
-			img[0][j] = pals[255];
-		}
-
-		for (i = 1; i < h; i++) {
-			for (j = 0; j < w; j++) {
-				img[i][j] = pals[255 - Math.abs(g[i][j] - g[i - 1][j])];
-			}
-		}
-	}
-
-	private static void edgeHorizontalDifferential(BitmapPalette[][] img) {
-		int i, j, h, w;
-		BitmapPalette[] pals = new BitmapPalette[256];
-
-		for (i = 0; i < 256; i++) {
-			pals[i] = new BitmapPalette((byte) i, (byte) i, (byte) i);
-		}
-
-		h = img.length;
-		w = img[0].length;
-		int g[][] = new int[h][w];
-
-		for (i = 0; i < h; i++) {
-			for (j = 0; j < w; j++) {
-				g[i][j] = (30 * img[i][j].getRgbRed() + 59
-						* img[i][j].getRgbGreen() + 11 * img[i][j].getRgbBlue()) / 100;
-			}
-		}
-		for (j = 0; j < w; j++) {
-			img[0][j] = pals[255];
-		}
-
-		for (i = 0; i < h; i++) {
-			for (j = 1; j < w; j++) {
-				img[i][j] = pals[255 - Math.abs(g[i][j] - g[i][j - 1])];
-			}
-		}
-	}
-
-	@SuppressWarnings("unused")
-	private static void edgeAverage(BitmapPalette[][] img) {
-		// Get edge of image
-
-		int passLine = 48;
-
-		int i, j, h, w;
-
-		h = img.length;
-		w = img[0].length;
-
-		// Gray image
-		int g[][] = new int[h][w];
-
-		BitmapPalette black = new BitmapPalette((byte) 0, (byte) 0, (byte) 0);
-		BitmapPalette white = new BitmapPalette((byte) 255, (byte) 255,
-				(byte) 255);
-
-		for (i = 0; i < h; i++) {
-			for (j = 0; j < w; j++) {
-				// True colr to gray
-				g[i][j] = (30 * img[i][j].getRgbRed() + 59
-						* img[i][j].getRgbGreen() + 11 * img[i][j].getRgbBlue()) / 100;
-			}
-		}
-
-		// OK now got a gray image in grayImg
-		// Cut edge now with an avarage method
-
-		// 1. Four corners of image
-
-		// Left top
-		if ((g[0][1] + g[1][0] + g[1][1]) / 3 > passLine) {
-			img[0][0] = black;
-		} else {
-			img[0][0] = white;
-		}
-
-		// Right top
-		if ((g[0][w - 2] + g[1][w - 2] + g[1][w - 1]) / 3 > passLine) {
-			img[0][w - 1] = black;
-		} else {
-			img[0][w - 1] = white;
-		}
-
-		// Left bottom
-		if ((g[h - 2][0] + g[h - 2][1] + g[h - 1][1]) / 3 > passLine) {
-			img[h - 1][0] = black;
-		} else {
-			img[h - 1][0] = white;
-		}
-
-		// Right bottom
-		if ((g[h - 2][w - 1] + g[h - 2][w - 2] + g[h - 1][w - 2]) / 3 > passLine) {
-			img[h - 1][w - 1] = black;
-		} else {
-			img[h - 1][w - 1] = white;
-		}
-
-		// 2. The first and the last column, except corners
-		for (i = 1; i < h - 2; i++) {
-			if ((g[i - 1][0] + g[i - 1][1] + g[i][1] + g[i + 1][1] + g[i + 1][0]) / 5 > passLine) {
-				img[i][0] = black;
-			} else {
-				img[i][0] = white;
-			}
-
-			if ((g[i - 1][w - 1] + g[i - 1][w - 2] + g[i][w - 2]
-					+ g[i + 1][w - 2] + g[i + 1][w - 1]) / 5 > passLine) {
-				img[i][w - 1] = black;
-			} else {
-				img[i][w - 1] = white;
-			}
-		}
-
-		// 3. The first and the last Row, except corners
-		for (j = 1; j < w - 2; j++) {
-			if ((g[0][j - 1] + g[1][j - 1] + g[1][j] + g[1][j + 1] + g[0][j + 1]) / 5 > passLine) {
-				img[0][j] = black;
-			} else {
-				img[0][j] = white;
-			}
-
-			if ((g[h - 1][j - 1] + g[h - 2][j - 1] + g[h - 2][j]
-					+ g[h - 2][j + 1] + g[h - 1][j + 1]) / 5 > passLine) {
-				img[h - 1][j] = black;
-			} else {
-				img[h - 1][j] = white;
-			}
-		}
-
-		// 4. others
-		for (i = 1; i < h - 2; i++) {
-			for (j = 1; j < w - 2; j++) {
-				if ((g[i - 1][j - 1] + g[i - 1][j] + g[i - 1][j + 1]
-						+ g[i][j - 1] + g[i][j + 1] + g[i + 1][j - 1]
-						+ g[i + 1][j] + g[i + 1][j + 1]) / 8 > passLine) {
-					img[i][j] = black;
-				} else {
-					img[i][j] = white;
-				}
-			}
-		}
 	}
 
 	public static void drawRectangle(BitmapPalette img[][], int x1, int y1,
